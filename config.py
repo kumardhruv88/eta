@@ -22,10 +22,25 @@ HVFHV_URL = (
     "https://d37ci6vzurychx.cloudfront.net/trip-data/"
     "fhvhv_tripdata_2024-01.parquet"
 )
-RAW_FILE_NAME       = "fhvhv_2024_01.parquet"
+RAW_FILE_NAME       = "fhvhv_tripdata_2024-01 (1).parquet"
 INTERIM_SAMPLE_NAME = "sample.parquet"
 INTERIM_FILTERED_NAME = "sample_filtered.parquet"
 PROCESSED_FILE_NAME = "features.parquet"
+
+# Exact feature order used by preprocessor — must match NB03 FEATURES list
+FEATURE_NAMES = [
+    "pickup_hour", "pickup_day_of_week", "is_weekend",
+    "is_rush_hour", "is_night", "PULocationID",
+    "DOLocationID", "operator", "shared_request_flag",
+    "wav_request_flag",
+]
+
+# Columns to load from raw parquet (column pruning for speed on 500 MB file)
+RAW_COLUMNS_NEEDED = [
+    "hvfhs_license_num", "request_datetime", "on_scene_datetime",
+    "PULocationID", "DOLocationID", "trip_miles", "trip_time",
+    "shared_request_flag", "wav_request_flag",
+]
 
 # ─────────────────────────────────────────────
 # SAMPLING

@@ -9,6 +9,8 @@ optuna
 shap
 fastapi
 uvicorn[standard]
+aiofiles
+python-multipart
 joblib
 requests
 tqdm

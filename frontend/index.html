@@ -1,0 +1,440 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Driver ETA Predictor — NYC Ride-Hailing Intelligence</title>
+  <meta name="description" content="Production ML model for NYC ride-hailing pickup ETA prediction powered by XGBoost and trained on 300k TLC trips." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+
+<!-- ═══════════════════════════ HEADER ═══════════════════════════ -->
+<header class="header">
+  <div class="header-inner">
+    <div class="logo">
+      <div class="logo-icon">
+        <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <circle cx="12" cy="12" r="3"/>
+          <path d="M12 1v4M12 19v4M4.22 4.22l2.83 2.83M16.95 16.95l2.83 2.83M1 12h4M19 12h4M4.22 19.78l2.83-2.83M16.95 7.05l2.83-2.83"/>
+        </svg>
+      </div>
+      <div>
+        <span class="logo-title">ETA<span class="accent">ML</span></span>
+        <span class="logo-sub">Driver Pickup Intelligence</span>
+      </div>
+    </div>
+    <div class="header-badges">
+      <span class="badge badge-model" id="model-status-badge">
+        <span class="badge-dot" id="model-dot"></span>
+        <span id="model-status-text">Connecting...</span>
+      </span>
+      <span class="badge badge-data">NYC TLC 2024</span>
+      <span class="badge badge-algo">XGBoost</span>
+    </div>
+  </div>
+</header>
+
+<!-- ═══════════════════════════ HERO ═══════════════════════════ -->
+<section class="hero">
+  <div class="hero-bg">
+    <div class="orb orb-1"></div>
+    <div class="orb orb-2"></div>
+    <div class="orb orb-3"></div>
+    <div class="grid-overlay"></div>
+  </div>
+  <div class="hero-content">
+    <p class="hero-eyebrow">Production ML · 300k Trips · 0.1s Inference</p>
+    <h1 class="hero-title">Predict Driver<br/><span class="gradient-text">Pickup ETA</span></h1>
+    <p class="hero-sub">
+      XGBoost model trained on NYC TLC HVFHV data. Enter trip parameters
+      to get a real-time ETA prediction with confidence bounds.
+    </p>
+    <div class="hero-stats" id="hero-stats">
+      <div class="hero-stat">
+        <span class="hero-stat-value" id="stat-mae">—</span>
+        <span class="hero-stat-label">MAE (seconds)</span>
+      </div>
+      <div class="hero-stat-div"></div>
+      <div class="hero-stat">
+        <span class="hero-stat-value" id="stat-r2">—</span>
+        <span class="hero-stat-label">R² Score</span>
+      </div>
+      <div class="hero-stat-div"></div>
+      <div class="hero-stat">
+        <span class="hero-stat-value" id="stat-trips">300k</span>
+        <span class="hero-stat-label">Training Trips</span>
+      </div>
+      <div class="hero-stat-div"></div>
+      <div class="hero-stat">
+        <span class="hero-stat-value" id="stat-mape">—</span>
+        <span class="hero-stat-label">MAPE</span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════════════════ MAIN LAYOUT ═══════════════════════════ -->
+<main class="main">
+
+  <!-- ── PREDICTION FORM ── -->
+  <section class="card card-form" id="predict-section">
+    <div class="card-header">
+      <div class="card-icon card-icon-purple">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z"/>
+          <circle cx="12" cy="9" r="2.5"/>
+        </svg>
+      </div>
+      <div>
+        <h2 class="card-title">Trip Request</h2>
+        <p class="card-subtitle">Configure pickup parameters</p>
+      </div>
+    </div>
+
+    <form id="predict-form" autocomplete="off">
+
+      <!-- Row 1: Time -->
+      <div class="form-section">
+        <h3 class="form-section-title">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+          Temporal Features
+        </h3>
+        <div class="form-row">
+          <div class="form-group">
+            <label class="label" for="pickup-hour">Hour of Request</label>
+            <div class="input-wrapper">
+              <select id="pickup-hour" class="input" required>
+                <option value="">Select hour...</option>
+              </select>
+            </div>
+            <span class="input-hint" id="hour-hint"></span>
+          </div>
+          <div class="form-group">
+            <label class="label" for="pickup-dow">Day of Week</label>
+            <div class="input-wrapper">
+              <select id="pickup-dow" class="input" required>
+                <option value="">Select day...</option>
+                <option value="0">Monday</option>
+                <option value="1">Tuesday</option>
+                <option value="2">Wednesday</option>
+                <option value="3">Thursday</option>
+                <option value="4">Friday</option>
+                <option value="5">Saturday</option>
+                <option value="6">Sunday</option>
+              </select>
+            </div>
+          </div>
+        </div>
+        <!-- Auto-computed flags -->
+        <div class="flags-row" id="auto-flags">
+          <div class="flag-chip" id="flag-weekend">
+            <span class="flag-dot"></span>Weekend
+          </div>
+          <div class="flag-chip" id="flag-rush">
+            <span class="flag-dot"></span>Rush Hour
+          </div>
+          <div class="flag-chip" id="flag-night">
+            <span class="flag-dot"></span>Night
+          </div>
+        </div>
+      </div>
+
+      <!-- Row 2: Zones -->
+      <div class="form-section">
+        <h3 class="form-section-title">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
+          Location
+        </h3>
+        <div class="form-row">
+          <div class="form-group">
+            <label class="label" for="pu-zone">Pickup Zone (TLC)</label>
+            <div class="input-wrapper">
+              <select id="pu-zone" class="input" required>
+                <option value="">Loading zones...</option>
+              </select>
+            </div>
+          </div>
+          <div class="form-group">
+            <label class="label" for="do-zone">Dropoff Zone (TLC)</label>
+            <div class="input-wrapper">
+              <select id="do-zone" class="input" required>
+                <option value="">Loading zones...</option>
+              </select>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Row 3: Trip Options -->
+      <div class="form-section">
+        <h3 class="form-section-title">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="1" y="3" width="15" height="13"/><polygon points="16 8 20 8 23 11 23 16 16 16 16 8"/><circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/></svg>
+          Trip Options
+        </h3>
+        <div class="form-row">
+          <div class="form-group">
+            <label class="label">Operator</label>
+            <div class="toggle-group">
+              <button type="button" class="toggle-btn active" data-field="operator" data-value="0" id="btn-uber">
+                <span class="toggle-icon">🚗</span> Uber
+              </button>
+              <button type="button" class="toggle-btn" data-field="operator" data-value="1" id="btn-lyft">
+                <span class="toggle-icon">🚕</span> Lyft
+              </button>
+            </div>
+          </div>
+          <div class="form-group">
+            <label class="label">Special Requests</label>
+            <div class="checkbox-group">
+              <label class="checkbox-item">
+                <input type="checkbox" id="shared-flag" />
+                <span class="checkbox-custom"></span>
+                <span>Shared / Pool ride</span>
+              </label>
+              <label class="checkbox-item">
+                <input type="checkbox" id="wav-flag" />
+                <span class="checkbox-custom"></span>
+                <span>Wheelchair accessible</span>
+              </label>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <button type="submit" class="btn-predict" id="predict-btn">
+        <span id="btn-text">Predict ETA</span>
+        <span id="btn-spinner" class="spinner hidden"></span>
+        <svg id="btn-arrow" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/>
+        </svg>
+      </button>
+    </form>
+  </section>
+
+  <!-- ── ETA RESULT ── -->
+  <section class="card card-result" id="result-section">
+    <div class="card-header">
+      <div class="card-icon card-icon-green">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>
+        </svg>
+      </div>
+      <div>
+        <h2 class="card-title">Prediction Result</h2>
+        <p class="card-subtitle">XGBoost model output</p>
+      </div>
+    </div>
+
+    <!-- Empty state -->
+    <div class="empty-state" id="empty-state">
+      <div class="empty-icon">
+        <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+          <circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>
+        </svg>
+      </div>
+      <p class="empty-title">No prediction yet</p>
+      <p class="empty-sub">Fill in trip details and click Predict ETA</p>
+    </div>
+
+    <!-- Result display -->
+    <div class="result-display hidden" id="result-display">
+      <div class="eta-hero">
+        <div class="eta-ring" id="eta-ring">
+          <svg class="eta-ring-svg" viewBox="0 0 200 200">
+            <circle class="ring-track" cx="100" cy="100" r="85"/>
+            <circle class="ring-fill" cx="100" cy="100" r="85" id="ring-fill-el"/>
+          </svg>
+          <div class="eta-center">
+            <span class="eta-seconds" id="eta-seconds">—</span>
+            <span class="eta-unit">seconds</span>
+            <span class="eta-minutes" id="eta-minutes">— min</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="result-meta">
+        <div class="result-chip" id="confidence-chip">
+          <span id="confidence-dot" class="confidence-dot"></span>
+          <span id="confidence-label">—</span> Confidence
+        </div>
+        <p class="result-interpretation" id="interpretation-text">—</p>
+      </div>
+
+      <div class="range-bar-container">
+        <div class="range-label">
+          <span id="range-low">—</span>
+          <span class="range-mid">Prediction Range</span>
+          <span id="range-high">—</span>
+        </div>
+        <div class="range-track">
+          <div class="range-fill" id="range-fill"></div>
+          <div class="range-thumb" id="range-thumb"></div>
+        </div>
+      </div>
+
+      <div class="result-features" id="result-features">
+        <p class="result-features-title">Input Summary</p>
+        <div class="feature-pills" id="feature-pills"></div>
+      </div>
+    </div>
+
+    <!-- Error state -->
+    <div class="error-state hidden" id="error-state">
+      <div class="error-icon">⚠️</div>
+      <p class="error-title">Prediction Failed</p>
+      <p class="error-msg" id="error-msg">—</p>
+      <p class="error-hint">Make sure the API is running:<br/><code>uvicorn api.main:app --reload</code></p>
+    </div>
+  </section>
+
+  <!-- ── METRICS DASHBOARD ── -->
+  <section class="card card-wide" id="metrics-section">
+    <div class="card-header">
+      <div class="card-icon card-icon-orange">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>
+        </svg>
+      </div>
+      <div>
+        <h2 class="card-title">Model Performance Metrics</h2>
+        <p class="card-subtitle">Evaluated on held-out test set (20% chronological split)</p>
+      </div>
+    </div>
+    <div class="metrics-grid" id="metrics-grid">
+      <div class="metric-skeleton"></div>
+      <div class="metric-skeleton"></div>
+      <div class="metric-skeleton"></div>
+      <div class="metric-skeleton"></div>
+      <div class="metric-skeleton"></div>
+    </div>
+    <div class="metrics-note">
+      All metrics computed on original seconds scale after <code>np.expm1()</code> inverse transform.
+      Primary metric is MAE — equal weight to all errors, most representative of average user experience.
+    </div>
+  </section>
+
+  <!-- ── SHAP FEATURE IMPORTANCE ── -->
+  <section class="card card-wide" id="shap-section">
+    <div class="card-header">
+      <div class="card-icon card-icon-blue">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/>
+          <line x1="6" y1="20" x2="6" y2="14"/>
+        </svg>
+      </div>
+      <div>
+        <h2 class="card-title">Feature Importance (SHAP)</h2>
+        <p class="card-subtitle">Mean |SHAP| — contribution of each feature to predictions</p>
+      </div>
+    </div>
+    <div class="shap-chart-container">
+      <canvas id="shap-chart" height="280"></canvas>
+    </div>
+    <div class="shap-legend">
+      <div class="shap-legend-item">
+        <span class="shap-legend-dot shap-zone"></span>Zone features (target-encoded)
+      </div>
+      <div class="shap-legend-item">
+        <span class="shap-legend-dot shap-time"></span>Time features
+      </div>
+      <div class="shap-legend-item">
+        <span class="shap-legend-dot shap-binary"></span>Binary flags
+      </div>
+    </div>
+  </section>
+
+  <!-- ── HOW IT WORKS ── -->
+  <section class="card card-wide card-pipeline" id="pipeline-section">
+    <div class="card-header">
+      <div class="card-icon card-icon-pink">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/>
+        </svg>
+      </div>
+      <div>
+        <h2 class="card-title">ML Pipeline Architecture</h2>
+        <p class="card-subtitle">End-to-end production pipeline</p>
+      </div>
+    </div>
+    <div class="pipeline-steps">
+      <div class="pipeline-step">
+        <div class="step-num">01</div>
+        <div class="step-icon">📦</div>
+        <div class="step-content">
+          <h4>Data Acquisition</h4>
+          <p>NYC TLC HVFHV Parquet, 20M trips, column-pruned load for speed</p>
+          <code>pd.read_parquet(columns=[...])</code>
+        </div>
+      </div>
+      <div class="pipeline-arrow">→</div>
+      <div class="pipeline-step">
+        <div class="step-num">02</div>
+        <div class="step-icon">🔍</div>
+        <div class="step-content">
+          <h4>EDA + Statistics</h4>
+          <p>Mann-Whitney U, CLT demo, Spearman correlation, MNAR analysis</p>
+          <code>scipy.stats + seaborn</code>
+        </div>
+      </div>
+      <div class="pipeline-arrow">→</div>
+      <div class="pipeline-step">
+        <div class="step-num">03</div>
+        <div class="step-icon">⚙️</div>
+        <div class="step-content">
+          <h4>Feature Engineering</h4>
+          <p>TargetEncoder (zones), StandardScaler, log1p target, chronological split</p>
+          <code>sklearn Pipeline + category_encoders</code>
+        </div>
+      </div>
+      <div class="pipeline-arrow">→</div>
+      <div class="pipeline-step">
+        <div class="step-num">04</div>
+        <div class="step-icon">🏆</div>
+        <div class="step-content">
+          <h4>Model Selection</h4>
+          <p>Baseline → Linear → Ridge → Random Forest → XGBoost comparison</p>
+          <code>tree_method=hist, n_jobs=-1</code>
+        </div>
+      </div>
+      <div class="pipeline-arrow">→</div>
+      <div class="pipeline-step">
+        <div class="step-num">05</div>
+        <div class="step-icon">🎯</div>
+        <div class="step-content">
+          <h4>Hyperparameter Tuning</h4>
+          <p>Optuna TPE sampler, 50 trials, MedianPruner, TimeSeriesSplit(5)</p>
+          <code>optuna.create_study(direction='minimize')</code>
+        </div>
+      </div>
+      <div class="pipeline-arrow">→</div>
+      <div class="pipeline-step">
+        <div class="step-num">06</div>
+        <div class="step-icon">📊</div>
+        <div class="step-content">
+          <h4>Evaluation</h4>
+          <p>SHAP analysis, residual diagnostics, segment-level error analysis</p>
+          <code>shap.TreeExplainer(model)</code>
+        </div>
+      </div>
+    </div>
+  </section>
+
+</main>
+
+<!-- ═══════════════════════════ FOOTER ═══════════════════════════ -->
+<footer class="footer">
+  <p>Driver ETA Prediction · XGBoost · NYC TLC Data · FastAPI · Built with sklearn Pipeline</p>
+  <p class="footer-sub">
+    <a href="/docs" target="_blank">API Docs</a> ·
+    <a href="https://github.com/kumardhruv88/eta" target="_blank">GitHub</a>
+  </p>
+</footer>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
