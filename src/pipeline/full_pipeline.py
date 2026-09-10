@@ -182,7 +182,11 @@ def step_train(X_train, y_train) -> XGBRegressor:
     t0 = _log("Step 4/5 — Train XGBoost (tree_method=hist)")
     params = {
         **config.XGB_DEFAULTS,
-        "n_estimators": 300,         # fast default; Notebook 05 tunes further
+        "n_estimators": 800,         # Increased from 300
+        "max_depth": 8,              # Increased from default 6
+        "learning_rate": 0.02,       # Decreased from default 0.05
+        "subsample": 0.9,
+        "colsample_bytree": 0.9,
         "tree_method":  "hist",      # fastest CPU training
         "verbosity":    0,
     }
