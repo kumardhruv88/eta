@@ -3,7 +3,12 @@
  * Talks to FastAPI at localhost:8000
  */
 
-const API = "http://localhost:8000";
+// API base URL — change this to your Render URL when deployed
+// e.g. const API = "https://driver-eta-api.onrender.com";
+const API = window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1"
+  ? "http://127.0.0.1:8000"
+  : "https://driver-eta-api.onrender.com";  // ← replace with your actual Render URL after deploying
+
 
 // ────────────────────────────────────────────────
 // State

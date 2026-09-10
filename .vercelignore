@@ -1,0 +1,15 @@
+# Exclude everything except the frontend folder
+api/
+src/
+data/
+saved_models/
+notebooks/
+scripts/
+reports/
+*.parquet
+*.joblib
+*.npy
+*.py
+*.ipynb
+requirements.txt
+render.yaml
