@@ -1,0 +1,22 @@
+{
+  "MAE_seconds": 86.99903079718233,
+  "RMSE_seconds": 129.45015691123086,
+  "MAPE_pct": 57.878661788498476,
+  "R2": 0.08836320460459413,
+  "p90_error_s": 186.12116012573227,
+  "p95_error_s": 263.26342697143554,
+  "n_test": 27778,
+  "feature_names": [
+    "pickup_hour",
+    "pickup_day_of_week",
+    "is_weekend",
+    "is_rush_hour",
+    "is_night",
+    "PULocationID",
+    "DOLocationID",
+    "operator",
+    "shared_request_flag",
+    "wav_request_flag"
+  ],
+  "shap_importance": []
+}
